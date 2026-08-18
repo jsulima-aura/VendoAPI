@@ -18,7 +18,7 @@ Utworz plik `.env` na podstawie `.env.example`:
 Copy-Item .env.example .env
 ```
 
-Uzupelnij dane polaczenia i ustaw dlugi, losowy `API_TOKEN`. Zmienna `POSTGRES_HOST` musi wskazywac adres osiagalny z kontenera. Nie uzywaj `localhost`, poniewaz wewnatrz kontenera oznacza on sam kontener API.
+Uzupelnij dane polaczenia. Zmienna `POSTGRES_HOST` musi wskazywac adres osiagalny z kontenera. Nie uzywaj `localhost`, poniewaz wewnatrz kontenera oznacza on sam kontener API.
 
 ## Uruchomienie
 
@@ -45,16 +45,12 @@ Odpowiedz:
 ### Eksport poprzedniego tygodnia
 
 ```powershell
-$headers = @{ Authorization = "Bearer dlugi_losowy_token" }
 Invoke-WebRequest `
   -Uri http://localhost:8000/export/weekly `
-  -Headers $headers `
   -OutFile eksport.csv
 ```
 
 Endpoint wyznacza poprzedni pelny tydzien w strefie z `TIMEZONE`: od poprzedniego poniedzialku 00:00 (wlacznie) do biezacego poniedzialku 00:00 (wylacznie). Zwracany plik ma kodowanie UTF-8, separator `;`, naglowki kolumn oraz nazwe `eksport_YYYY-MM-DD_YYYY-MM-DD.csv`.
-
-Brak naglowka `Authorization` lub nieprawidlowy token zwraca status HTTP `401`.
 
 ## Zatrzymanie
 

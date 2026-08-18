@@ -295,7 +295,7 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/export/weekly")
+@app.get("/export/weekly", dependencies=[Depends(require_api_token)])
 def export_weekly() -> Response:
     start_date, end_date = previous_full_week()
 

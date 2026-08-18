@@ -28,6 +28,36 @@ docker compose up --build -d
 
 API bedzie dostepne pod adresem `http://localhost:8001` lub pod adresem IP komputera, np. `http://192.168.0.11:8001`. Port hosta ustawiasz zmienna `API_PORT` w pliku `.env`.
 
+## Cloudflare Tunnel w osobnym kontenerze
+
+Compose tworzy stala siec Docker o nazwie `vendoapi_network`. Istniejacy kontener
+`cloudflared` podlacz do niej na serwerze:
+
+```bash
+docker network connect vendoapi_network NAZWA_KONTENERA_CLOUDFLARED
+```
+
+W Cloudflare Zero Trust ustaw usluge tunelu na:
+
+```text
+http://api:8000
+```
+
+Nie uzywaj `localhost`, poniewaz z perspektywy kontenera Cloudflare oznacza on
+sam kontener tunelu. Po zmianie konfiguracji przebuduj API:
+
+```bash
+docker compose up -d --build
+```
+
+Sprawdz, czy oba kontenery sa w tej samej sieci:
+
+```bash
+docker network inspect vendoapi_network
+```
+
+Endpoint eksportu wymaga naglowka `Authorization: Bearer API_TOKEN`.
+
 ## Endpointy
 
 ### Sprawdzenie stanu

@@ -1,8 +1,14 @@
 services:
-  api:
+  sales_vendo_api:
     build: .
     env_file:
       - .env
     ports:
       - "${API_PORT:-8001}:8000"
+    networks:
+      - sales_vendoapi_network
     restart: unless-stopped
+
+networks:
+  sales_vendoapi_network:
+    name: sales_vendoapi_network

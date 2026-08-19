@@ -40,6 +40,7 @@ dok_sprzedazy AS (
         t.tr_zamknieta,
         t.k_idklienta,
         COALESCE(k.k_nazwa, t.tr_knazwa, '(brak klienta)') AS klient_nazwa,
+        COALESCE(rk.rk_typrodzaju, '(brak segmentu klienta)') AS segment_klienta,
         CASE
             WHEN pr.p_imie IS NULL AND pr.p_nazwisko IS NULL THEN NULL
             ELSE CONCAT_WS(
@@ -51,6 +52,7 @@ dok_sprzedazy AS (
     FROM tg_transakcje t
     JOIN rodzaje_sprzedazy rs ON rs.tr_rodzaj = t.tr_rodzaj
     LEFT JOIN tb_klient k ON k.k_idklienta = t.k_idklienta
+    LEFT JOIN ts_rodzajklienta rk ON rk.rk_idrodzajklienta = k.rk_idrodzajklienta
     LEFT JOIN tb_pracownicy pr ON pr.p_idpracownika = t.tr_zaliczonedla
     CROSS JOIN cfg c
     WHERE COALESCE(t.tr_datasprzedaz, t.tr_data4) >= c.data_od
@@ -74,6 +76,7 @@ linia_raw AS (
         d.typ_dokumentu,
         d.k_idklienta,
         d.klient_nazwa,
+        d.segment_klienta,
         d.sprzedawca_inicjaly,
         te.ttw_idtowaru,
         tw.ttw_klucz AS produkt_kod,
@@ -144,6 +147,7 @@ dok_produkt AS (
         ean,
         k_idklienta,
         klient_nazwa,
+        segment_klienta,
         sprzedawca_inicjaly,
         SUM(ilosc) AS ilosc_dokumentu,
         SUM(linia_netto) AS netto_dokumentu,
@@ -154,7 +158,7 @@ dok_produkt AS (
     GROUP BY
         tr_idtrans, tr_fullnumer, data_sprzedazy, data_wystawienia, seria, typ_dokumentu,
         ttw_idtowaru, produkt_kod, produkt_nazwa, ean, k_idklienta, klient_nazwa,
-        sprzedawca_inicjaly
+        segment_klienta, sprzedawca_inicjaly
 ),
 prod_suma AS (
     SELECT
@@ -162,6 +166,7 @@ prod_suma AS (
         dp.produkt_kod,
         dp.produkt_nazwa,
         dp.ean,
+        dp.segment_klienta,
         SUM(dp.ilosc_dokumentu) AS ilosc_ogolem,
         SUM(dp.netto_dokumentu) AS netto_ogolem,
         SUM(dp.brutto_dokumentu) AS brutto_ogolem,
@@ -171,7 +176,7 @@ prod_suma AS (
         SUM(CASE WHEN dp.seria = c.sklep2_seria THEN dp.netto_dokumentu ELSE 0 END) AS sklep2_netto
     FROM dok_produkt dp
     CROSS JOIN cfg c
-    GROUP BY dp.ttw_idtowaru, dp.produkt_kod, dp.produkt_nazwa, dp.ean
+    GROUP BY dp.ttw_idtowaru, dp.produkt_kod, dp.produkt_nazwa, dp.ean, dp.segment_klienta
 ),
 stan_mag AS (
     SELECT
@@ -185,6 +190,7 @@ SELECT
     ps.produkt_kod AS "Kod",
     ps.produkt_nazwa AS "Nazwa",
     ps.ean AS "EAN",
+    ps.segment_klienta AS "Segment klienta",
     ROUND(ps.brutto_ogolem, 2) AS "Brutto (*)",
     ROUND(ps.netto_ogolem, 2) AS "Sprzedaz netto [PLN]",
     ROUND(ps.marza_ogolem, 2) AS "Marza [PLN]",
@@ -211,6 +217,7 @@ SELECT
     ROUND(dp.marza_dokumentu, 2) AS "Marza dokumentu [PLN]"
 FROM dok_produkt dp
 JOIN prod_suma ps ON ps.ttw_idtowaru = dp.ttw_idtowaru
+                 AND ps.segment_klienta = dp.segment_klienta
 LEFT JOIN stan_mag sm ON sm.ttw_idtowaru = dp.ttw_idtowaru
 CROSS JOIN cfg c
 WHERE ROUND(dp.ilosc_dokumentu, 6) <> 0
@@ -222,7 +229,7 @@ ORDER BY
     dp.tr_fullnumer;
 """
 CSV_HEADERS = (
-    "Kod", "Nazwa", "EAN", "Brutto (*)", "Sprzedaz netto [PLN]",
+    "Kod", "Nazwa", "EAN", "Segment klienta", "Brutto (*)", "Sprzedaz netto [PLN]",
     "Marza [PLN]", "% marzy", "Ilosc", "Stan ogolny:Dane rozszerzone",
     "Srednia sprzedaz netto [PLN]", "Koszt [PLN]", "Typ dokumentu",
     "Numer dokumentu", "Data sprzedazy", "Data wystawienia", "Klient",

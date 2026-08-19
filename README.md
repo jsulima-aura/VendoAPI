@@ -98,6 +98,16 @@ Invoke-WebRequest `
 
 Endpoint wyznacza poprzedni pelny dzien w strefie z `TIMEZONE`: od wczoraj 00:00 (wlacznie) do dzisiaj 00:00 (wylacznie). Format pliku jest taki sam jak dla eksportu tygodniowego.
 
+### Eksport wybranego zakresu
+
+```powershell
+Invoke-WebRequest `
+  -Uri "http://192.168.0.11:8001/export/range?data_od=2026-08-01&data_do=2026-08-19" `
+  -OutFile eksport.csv
+```
+
+Parametr `data_od` jest wlaczny, a `data_do` wylaczny. Daty nalezy podawac w formacie `YYYY-MM-DD`.
+
 ## Zatrzymanie
 
 ```powershell

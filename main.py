@@ -1,7 +1,7 @@
 import csv
 import os
 import secrets
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from io import StringIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -308,6 +308,25 @@ def database_connection() -> psycopg.Connection:
     )
 
 
+def export_for_range(start_date: date, end_date: date) -> Response:
+    with database_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(EXPORT_QUERY, (start_date, end_date))
+            rows = cursor.fetchall()
+
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";", lineterminator="\n")
+    writer.writerow(CSV_HEADERS)
+    writer.writerows(rows)
+
+    filename = f"eksport_{start_date}_{end_date}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -316,42 +335,21 @@ def health() -> dict[str, str]:
 @app.get("/export/weekly", dependencies=[Depends(require_api_token)])
 def export_weekly() -> Response:
     start_date, end_date = previous_full_week()
-
-    with database_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(EXPORT_QUERY, (start_date.date(), end_date.date()))
-            rows = cursor.fetchall()
-
-    output = StringIO(newline="")
-    writer = csv.writer(output, delimiter=";", lineterminator="\n")
-    writer.writerow(CSV_HEADERS)
-    writer.writerows(rows)
-
-    filename = f"eksport_{start_date.date()}_{end_date.date()}.csv"
-    return Response(
-        content=output.getvalue().encode("utf-8"),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return export_for_range(start_date.date(), end_date.date())
 
 
 @app.get("/export/daily", dependencies=[Depends(require_api_token)])
 def export_daily() -> Response:
     start_date, end_date = previous_full_day()
+    return export_for_range(start_date.date(), end_date.date())
 
-    with database_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(EXPORT_QUERY, (start_date.date(), end_date.date()))
-            rows = cursor.fetchall()
 
-    output = StringIO(newline="")
-    writer = csv.writer(output, delimiter=";", lineterminator="\n")
-    writer.writerow(CSV_HEADERS)
-    writer.writerows(rows)
+@app.get("/export/range", dependencies=[Depends(require_api_token)])
+def export_range(data_od: date, data_do: date) -> Response:
+    if data_od >= data_do:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="data_do musi byc pozniejsza niz data_od",
+        )
 
-    filename = f"eksport_{start_date.date()}_{end_date.date()}.csv"
-    return Response(
-        content=output.getvalue().encode("utf-8"),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return export_for_range(data_od, data_do)

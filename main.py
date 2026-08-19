@@ -51,7 +51,7 @@ dok_sprzedazy AS (
     FROM tg_transakcje t
     JOIN rodzaje_sprzedazy rs ON rs.tr_rodzaj = t.tr_rodzaj
     LEFT JOIN tb_klient k ON k.k_idklienta = t.k_idklienta
-    LEFT JOIN tb_pracownicy pr ON pr.p_idpracownika = k.p_idpracownika
+    LEFT JOIN tb_pracownicy pr ON pr.p_idpracownika = t.tr_zaliczonedla
     CROSS JOIN cfg c
     WHERE COALESCE(t.tr_datasprzedaz, t.tr_data4) >= c.data_od
       AND COALESCE(t.tr_datasprzedaz, t.tr_data4) < c.data_do
@@ -267,6 +267,24 @@ def previous_full_week(now: datetime | None = None) -> tuple[datetime, datetime]
     return previous_monday, current_monday
 
 
+def previous_full_day(now: datetime | None = None) -> tuple[datetime, datetime]:
+    timezone_name = os.environ.get("TIMEZONE", "Europe/Warsaw")
+    try:
+        timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError as exc:
+        raise RuntimeError(f"Nieznana strefa czasowa: {timezone_name}") from exc
+
+    local_now = now.astimezone(timezone) if now else datetime.now(timezone)
+    current_day = local_now.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+    previous_day = current_day - timedelta(days=1)
+    return previous_day, current_day
+
+
 def database_connection() -> psycopg.Connection:
     required_variables = (
         "POSTGRES_HOST",
@@ -298,6 +316,28 @@ def health() -> dict[str, str]:
 @app.get("/export/weekly", dependencies=[Depends(require_api_token)])
 def export_weekly() -> Response:
     start_date, end_date = previous_full_week()
+
+    with database_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(EXPORT_QUERY, (start_date.date(), end_date.date()))
+            rows = cursor.fetchall()
+
+    output = StringIO(newline="")
+    writer = csv.writer(output, delimiter=";", lineterminator="\n")
+    writer.writerow(CSV_HEADERS)
+    writer.writerows(rows)
+
+    filename = f"eksport_{start_date.date()}_{end_date.date()}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/export/daily", dependencies=[Depends(require_api_token)])
+def export_daily() -> Response:
+    start_date, end_date = previous_full_day()
 
     with database_connection() as connection:
         with connection.cursor() as cursor:

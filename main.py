@@ -128,7 +128,6 @@ linia_our AS (
     FROM linia_full
         WHERE ttw_usluga = false
             AND ttw_rtowaru = 1
-            AND ttw_aktywny = 1
             AND has_partie
             AND is_finished = 1
             AND is_component = 0

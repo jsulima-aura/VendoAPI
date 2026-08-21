@@ -108,6 +108,18 @@ Invoke-WebRequest `
 
 Parametr `data_od` jest wlaczny, a `data_do` wylaczny. Daty nalezy podawac w formacie `YYYY-MM-DD`.
 
+Przykladowe zapytanie dla calego roku 2025:
+
+```powershell
+$headers = @{ Authorization = "Bearer API_TOKEN" }
+Invoke-WebRequest `
+  -Uri "http://localhost:8001/export/range?data_od=2025-01-01&data_do=2026-01-01" `
+  -Headers $headers `
+  -OutFile eksport_2025.csv
+```
+
+W tym przykladzie `2026-01-01` jest granica wylaczona, wiec eksport obejmuje okres od 1 stycznia do 31 grudnia 2025.
+
 ## Zatrzymanie
 
 ```powershell

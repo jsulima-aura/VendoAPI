@@ -85,6 +85,10 @@ linia_raw AS (
         tw.ttw_aktywny,
         COALESCE(tw.ttw_usluga, false) AS ttw_usluga,
         tw.ttw_rtowaru,
+        CASE
+            WHEN tw.ttw_rtowaru = 16 THEN 'ZESTAW'
+            ELSE 'PRODUKT'
+        END AS rodzaj_pozycji,
         COALESCE(rm.is_finished, 0) AS is_finished,
         COALESCE(rm.is_component, 0) AS is_component,
         EXISTS (
@@ -126,12 +130,15 @@ linia_full AS (
 linia_our AS (
     SELECT *
     FROM linia_full
-    WHERE ttw_usluga = false
-      AND ttw_rtowaru = 1
-      AND ttw_aktywny = 1
-      AND has_partie
-      AND is_finished = 1
-      AND is_component = 0
+    WHERE ttw_rtowaru = 16
+       OR (
+           ttw_usluga = false
+           AND ttw_rtowaru = 1
+           AND ttw_aktywny = 1
+           AND has_partie
+           AND is_finished = 1
+           AND is_component = 0
+       )
 ),
 dok_produkt AS (
     SELECT
@@ -145,6 +152,7 @@ dok_produkt AS (
         produkt_kod,
         produkt_nazwa,
         ean,
+        rodzaj_pozycji,
         k_idklienta,
         klient_nazwa,
         segment_klienta,
@@ -157,7 +165,7 @@ dok_produkt AS (
     FROM linia_our
     GROUP BY
         tr_idtrans, tr_fullnumer, data_sprzedazy, data_wystawienia, seria, typ_dokumentu,
-        ttw_idtowaru, produkt_kod, produkt_nazwa, ean, k_idklienta, klient_nazwa,
+        ttw_idtowaru, produkt_kod, produkt_nazwa, ean, rodzaj_pozycji, k_idklienta, klient_nazwa,
         segment_klienta, sprzedawca_inicjaly
 ),
 prod_suma AS (
@@ -187,6 +195,7 @@ stan_mag AS (
     GROUP BY p.ttw_idtowaru
 )
 SELECT
+    dp.rodzaj_pozycji AS "Rodzaj pozycji",
     ps.produkt_kod AS "Kod",
     ps.produkt_nazwa AS "Nazwa",
     ps.ean AS "EAN",
@@ -229,7 +238,7 @@ ORDER BY
     dp.tr_fullnumer;
 """
 CSV_HEADERS = (
-    "Kod", "Nazwa", "EAN", "Segment klienta", "Brutto (*)", "Sprzedaz netto [PLN]",
+    "Rodzaj pozycji", "Kod", "Nazwa", "EAN", "Segment klienta", "Brutto (*)", "Sprzedaz netto [PLN]",
     "Marza [PLN]", "% marzy", "Ilosc", "Stan ogolny:Dane rozszerzone",
     "Srednia sprzedaz netto [PLN]", "Koszt [PLN]", "Typ dokumentu",
     "Numer dokumentu", "Data sprzedazy", "Data wystawienia", "Klient",

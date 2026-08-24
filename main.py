@@ -131,7 +131,6 @@ linia_our AS (
         WHERE ttw_usluga = false
             AND ttw_rtowaru = 1
             AND has_partie
-            AND is_finished = 1
             AND is_component = 0
 ),
 dok_produkt AS (

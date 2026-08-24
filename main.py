@@ -128,10 +128,15 @@ linia_full AS (
 linia_our AS (
     SELECT *
     FROM linia_full
-        WHERE ttw_usluga = false
-            AND ttw_rtowaru = 1
-            AND has_partie
-            AND is_component = 0
+    WHERE ttw_usluga = false
+      AND ttw_rtowaru = 1
+      AND has_partie
+      AND NULLIF(BTRIM(COALESCE(ean, '')), '') IS NOT NULL
+      AND ean <> 'BRAK'
+      AND (
+          is_finished = 1
+          OR (is_finished = 0 AND is_component = 0)
+      )
 ),
 dok_produkt AS (
     SELECT

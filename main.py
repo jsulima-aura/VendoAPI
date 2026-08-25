@@ -58,14 +58,6 @@ dok_sprzedazy AS (
     WHERE COALESCE(t.tr_datasprzedaz, t.tr_data4) >= c.data_od
       AND COALESCE(t.tr_datasprzedaz, t.tr_data4) < c.data_do
 ),
-role_map AS (
-    SELECT
-        p.ttw_idtowaru,
-        MAX(CASE WHEN (p.tsk_flaga & 1) = 1 AND (p.tsk_flaga & 2) = 0 THEN 1 ELSE 0 END) AS is_finished,
-        MAX(CASE WHEN (p.tsk_flaga & 1) = 0 AND (p.tsk_flaga & 2) = 0 THEN 1 ELSE 0 END) AS is_component
-    FROM tg_produkcja p
-    GROUP BY p.ttw_idtowaru
-),
 linia_raw AS (
     SELECT
         d.tr_idtrans,
@@ -86,13 +78,6 @@ linia_raw AS (
         tw.ttw_aktywny,
         COALESCE(tw.ttw_usluga, false) AS ttw_usluga,
         tw.ttw_rtowaru,
-        COALESCE(rm.is_finished, 0) AS is_finished,
-        COALESCE(rm.is_component, 0) AS is_component,
-        EXISTS (
-            SELECT 1
-            FROM tg_partie pp
-            WHERE pp.ttw_idtowaru = tw.ttw_idtowaru
-        ) AS has_partie,
         ROUND(te.tel_iloscf, 4) * mnoznikkorekt(d.tr_zamknieta)::numeric AS ilosc,
         ROUND(
             getwartoscnetto(
@@ -119,24 +104,10 @@ linia_raw AS (
     JOIN tg_transelem te ON te.tr_idtrans = d.tr_idtrans
     JOIN tg_towary tw ON tw.ttw_idtowaru = te.ttw_idtowaru
     LEFT JOIN tg_grupytow grp ON grp.tgr_idgrupy = tw.tgr_idgrupy
-    LEFT JOIN role_map rm ON rm.ttw_idtowaru = tw.ttw_idtowaru
 ),
 linia_full AS (
     SELECT lr.*, ROUND(lr.linia_netto - lr.linia_koszt, 2) AS linia_marza
     FROM linia_raw lr
-),
-linia_our AS (
-    SELECT *
-    FROM linia_full
-    WHERE ttw_usluga = false
-      AND ttw_rtowaru = 1
-      AND has_partie
-      AND NULLIF(BTRIM(COALESCE(ean, '')), '') IS NOT NULL
-      AND ean <> 'BRAK'
-      AND (
-          is_finished = 1
-          OR (is_finished = 0 AND is_component = 0)
-      )
 ),
 dok_produkt AS (
     SELECT
@@ -160,7 +131,7 @@ dok_produkt AS (
         SUM(linia_brutto) AS brutto_dokumentu,
         SUM(linia_koszt) AS koszt_dokumentu,
         SUM(linia_marza) AS marza_dokumentu
-    FROM linia_our
+    FROM linia_full
     GROUP BY
         tr_idtrans, tr_fullnumer, data_sprzedazy, data_wystawienia, seria, typ_dokumentu,
         ttw_idtowaru, produkt_kod, produkt_nazwa, ean, grupa_i, k_idklienta, klient_nazwa,
@@ -225,12 +196,9 @@ SELECT
     ROUND(dp.marza_dokumentu, 2) AS "Marza dokumentu [PLN]"
 FROM dok_produkt dp
 JOIN prod_suma ps ON ps.ttw_idtowaru = dp.ttw_idtowaru
-                 AND ps.grupa_i IS NOT DISTINCT FROM dp.grupa_i
-                 AND ps.segment_klienta IS NOT DISTINCT FROM dp.segment_klienta
+                 AND ps.segment_klienta = dp.segment_klienta
 LEFT JOIN stan_mag sm ON sm.ttw_idtowaru = dp.ttw_idtowaru
 CROSS JOIN cfg c
-WHERE ROUND(dp.ilosc_dokumentu, 6) <> 0
-   OR ROUND(dp.netto_dokumentu, 6) <> 0
 ORDER BY
     ps.produkt_nazwa,
     ps.produkt_kod,
